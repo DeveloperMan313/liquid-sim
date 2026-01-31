@@ -4,13 +4,12 @@ use crate::simulation::{Cell, simulate_frame};
 
 pub async fn run() {
     // init flow grid
-    let grid_width = 16;
-    let grid_height = 16;
-    let cell_size_px = 32;
+    let grid_width = 128;
+    let grid_height = 128;
+    let cell_size_px = 4;
     let mut grid_1 = vec![vec![Cell::new(); grid_width]; grid_height];
-    // let mut grid_2 = vec![vec![Cell::new(); grid_width]; grid_height];
+    let mut grid_2 = vec![vec![Cell::new(); grid_width]; grid_height];
     let dt = 0.1;
-    let mut switch_grids = false;
 
     let texture_size = Vec2 {
         x: (grid_width * cell_size_px) as f32,
@@ -23,30 +22,25 @@ pub async fn run() {
     // for demo
     for row in grid_1[1..grid_height - 1].iter_mut() {
         for cell in row[1..grid_width - 1].iter_mut() {
+            cell.vel = DVec2 {
+                x: 1.0,
+                y: 0.2 * (rand() as f64) / u32::MAX as f64 - 0.1,
+            };
             cell.color = DVec4 {
                 x: (rand() as f64) / u32::MAX as f64,
                 y: (rand() as f64) / u32::MAX as f64,
                 z: (rand() as f64) / u32::MAX as f64,
-                w: 1.,
+                w: 1.0,
             };
         }
     }
-    let mut grid_2 = grid_1.clone(); // for demo
 
     loop {
-        // alternate grid_1 and grid_2 as in/out each iteration
-        let (grid_in, mut grid_out) = if !switch_grids {
-            (&grid_1, &mut grid_2)
-        } else {
-            (&grid_2, &mut grid_1)
-        };
-        switch_grids = !switch_grids;
-
         // simulate frame
-        simulate_frame(&grid_in, &mut grid_out, dt);
+        simulate_frame(&mut grid_1, &mut grid_2, dt);
 
         // render frame
-        let texture_bytes: Vec<u8> = grid_out
+        let texture_bytes: Vec<u8> = grid_1
             .iter()
             .flatten()
             .map(|cell: &Cell| cell.color.to_array())
