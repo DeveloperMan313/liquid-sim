@@ -41,6 +41,7 @@ fn simulate_diffusion(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>) 
     while delta_max > EPS {
         delta_max = 0.0;
 
+        // skip outer rows/columns for predictable 4 neighbor access
         for y in 1..grid_1.len() - 1 {
             for x in 1..grid_1[0].len() - 1 {
                 delta_max = match switch_grids {
@@ -55,29 +56,27 @@ fn simulate_diffusion(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>) 
 }
 
 fn simulate_advection(grid_in: &Vec<Vec<Cell>>, grid_out: &mut Vec<Vec<Cell>>, dt: f64) {
-    for (y, inner_rows) in grid_in[1..grid_in.len() - 1].iter().enumerate() {
-        for (x, _) in inner_rows[1..inner_rows.len() - 1].iter().enumerate() {
-            // account for skipped 1st row/column
-            advect_cell(x + 1, y + 1, grid_in, grid_out, dt);
+    for y in 1..grid_in.len() - 1 {
+        for x in 1..grid_in[0].len() - 1 {
+            advect_cell(x, y, grid_in, grid_out, dt);
         }
     }
 }
 
 fn clear_velocity_divergence(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>) {
-    for y in 1..grid_1.len() - 2 {
-        for x in 1..grid_1[0].len() - 2 {
+    for y in 1..grid_1.len() - 1 {
+        for x in 1..grid_1[0].len() - 1 {
             // calculate velocity divergence of cell
-            // account for skipped 1st row/column
-            grid_1[y + 1][x + 1].vel_div = (grid_1[y + 1][x + 2].vel.x - grid_1[y + 1][x].vel.x
-                + grid_1[y + 2][x + 1].vel.y
-                - grid_1[y][x + 1].vel.y)
+            grid_1[y][x].vel_div = (grid_1[y][x + 1].vel.x - grid_1[y][x - 1].vel.x
+                + grid_1[y + 1][x].vel.y
+                - grid_1[y - 1][x].vel.y)
                 * 0.5; // divide by 2 - x and y distance between cell's neighbors
-            grid_2[y + 1][x + 1] = grid_1[y + 1][x + 1];
+            grid_2[y][x] = grid_1[y][x];
         }
     }
 
     let mut delta_max: f64 = INFINITY;
-    let mut switch_grids = true;
+    let mut switch_grids = false;
 
     while delta_max > EPS {
         delta_max = 0.0;
