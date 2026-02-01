@@ -25,13 +25,15 @@ const EPS: f64 = 1e-2;
 const DIFF_K: f64 = 0.01;
 
 pub fn simulate_frame(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>, dt: f64) {
+    // initial state is in grid_1
+
     simulate_diffusion(grid_1, grid_2);
 
     simulate_advection(grid_2, grid_1, dt);
 
     clear_velocity_divergence(grid_1, grid_2);
 
-    // result is in ?
+    // updated state is in grid_1
 }
 
 fn simulate_diffusion(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>) {
@@ -39,7 +41,7 @@ fn simulate_diffusion(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>) 
     let mut switch_grids = false;
 
     // grid_2 should hold last update
-    while delta_max > EPS && !switch_grids {
+    while delta_max > EPS || !switch_grids {
         delta_max = 0.0;
 
         // skip outer rows/columns for predictable 4 neighbor access
@@ -65,6 +67,7 @@ fn simulate_advection(grid_in: &Vec<Vec<Cell>>, grid_out: &mut Vec<Vec<Cell>>, d
 }
 
 fn clear_velocity_divergence(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>) {
+    // calculate velocity divergence
     for y in 1..grid_1.len() - 1 {
         for x in 1..grid_1[0].len() - 1 {
             // calculate velocity divergence of cell
@@ -72,14 +75,16 @@ fn clear_velocity_divergence(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<C
                 + grid_1[y + 1][x].vel.y
                 - grid_1[y - 1][x].vel.y)
                 * 0.5; // divide by 2 - x and y distance between cell's neighbors
-            grid_2[y][x] = grid_1[y][x];
+            grid_2[y][x].vel_div = grid_1[y][x].vel_div;
         }
     }
 
+    // calculate velocity potential
     let mut delta_max: f64 = INFINITY;
     let mut switch_grids = false;
 
-    while delta_max > EPS {
+    // grid_2 should hold last update
+    while delta_max > EPS || !switch_grids {
         delta_max = 0.0;
 
         for y in 1..grid_1.len() - 1 {
@@ -92,6 +97,17 @@ fn clear_velocity_divergence(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<C
         }
 
         switch_grids = !switch_grids;
+    }
+
+    // subtract curl-free field from velocity field, thus clearing it of divergence
+    for y in 1..grid_1.len() - 1 {
+        for x in 1..grid_1[0].len() - 1 {
+            let curl_free = DVec2 {
+                x: (grid_2[y][x + 1].vel_pot - grid_2[y][x - 1].vel_pot) * 0.5,
+                y: (grid_2[y + 1][x].vel_pot - grid_2[y - 1][x].vel_pot) * 0.5,
+            }; // divide by 2 - x and y distance between cell's neighbors
+            grid_1[y][x].vel = grid_2[y][x].vel - curl_free;
+        }
     }
 }
 
