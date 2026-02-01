@@ -38,7 +38,8 @@ fn simulate_diffusion(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>) 
     let mut delta_max: f64 = INFINITY;
     let mut switch_grids = false;
 
-    while delta_max > EPS {
+    // grid_2 should hold last update
+    while delta_max > EPS && !switch_grids {
         delta_max = 0.0;
 
         // skip outer rows/columns for predictable 4 neighbor access
