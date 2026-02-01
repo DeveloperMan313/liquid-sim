@@ -5,6 +5,8 @@ use macroquad::math::{DVec2, DVec4};
 #[derive(Clone, Copy)]
 pub struct Cell {
     pub vel: DVec2,
+    vel_div: f64,
+    vel_pot: f64,
     pub color: DVec4,
 }
 
@@ -12,6 +14,8 @@ impl Cell {
     pub fn new() -> Cell {
         return Cell {
             vel: DVec2::ZERO,
+            vel_div: 0.0,
+            vel_pot: 0.0,
             color: DVec4::ZERO,
         };
     }
@@ -25,9 +29,9 @@ pub fn simulate_frame(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>, 
 
     simulate_advection(grid_2, grid_1, dt);
 
-    // clear vel divergence
+    clear_velocity_divergence(grid_1, grid_2);
 
-    // result is in grid_1
+    // result is in ?
 }
 
 fn simulate_diffusion(grid_in: &Vec<Vec<Cell>>, grid_out: &mut Vec<Vec<Cell>>) {
@@ -45,11 +49,41 @@ fn simulate_diffusion(grid_in: &Vec<Vec<Cell>>, grid_out: &mut Vec<Vec<Cell>>) {
 }
 
 fn simulate_advection(grid_in: &Vec<Vec<Cell>>, grid_out: &mut Vec<Vec<Cell>>, dt: f64) {
-    // don't simulate outer cells for predictable access to 4 neighbors
     for (y, inner_rows) in grid_in[1..grid_in.len() - 1].iter().enumerate() {
         for (x, _) in inner_rows[1..inner_rows.len() - 1].iter().enumerate() {
             // account for skipped 1st row/column
             advect_cell(x + 1, y + 1, grid_in, grid_out, dt);
+        }
+    }
+}
+
+fn clear_velocity_divergence(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>) {
+    for y in 1..grid_1.len() - 2 {
+        for x in 1..grid_1[0].len() - 2 {
+            // calculate velocity divergence of cell
+            // account for skipped 1st row/column
+            grid_1[y + 1][x + 1].vel_div = (grid_1[y + 1][x + 2].vel.x - grid_1[y + 1][x].vel.x
+                + grid_1[y + 2][x + 1].vel.y
+                - grid_1[y][x + 1].vel.y)
+                * 0.5; // divide by 2 - x and y distance between cell's neighbors
+            grid_2[y + 1][x + 1] = grid_1[y + 1][x + 1];
+        }
+    }
+
+    let mut delta_max: f64 = INFINITY;
+    let mut switch_grids = false;
+    while delta_max > EPS {
+        switch_grids = !switch_grids;
+        delta_max = 0.0;
+
+        for y in 1..grid_1.len() - 2 {
+            for x in 1..grid_1[0].len() - 2 {
+                // account for skipped 1st row/column
+                delta_max = match switch_grids {
+                    true => delta_max.max(update_cell_vel_pot(x + 1, y + 1, grid_2, grid_1)),
+                    false => delta_max.max(update_cell_vel_pot(x + 1, y + 1, grid_1, grid_2)),
+                };
+            }
         }
     }
 }
@@ -105,7 +139,7 @@ fn advect_cell(
     let int_x = source.x.fract();
     let int_y = source.y.fract();
 
-    // 1 is distance between neighbor cell centers
+    // lerp coefficients for each neighbor
     let k_top_left = (1.0 - int_x) * (1.0 - int_y);
     let k_top_right = int_x * (1.0 - int_y);
     let k_bottom_left = (1.0 - int_x) * int_y;
@@ -119,4 +153,21 @@ fn advect_cell(
         + grid_in[tl_y][tl_x + 1].color * k_top_right
         + grid_in[tl_y + 1][tl_x].color * k_bottom_left
         + grid_in[tl_y + 1][tl_x + 1].color * k_bottom_right;
+}
+
+// returns velocity potential delta
+fn update_cell_vel_pot(
+    x: usize,
+    y: usize,
+    grid_in: &Vec<Vec<Cell>>,
+    grid_out: &mut Vec<Vec<Cell>>,
+) -> f64 {
+    let old_pot = grid_in[y][x].vel_pot;
+    grid_out[y][x].vel_pot = (grid_in[y][x - 1].vel_pot
+        + grid_in[y][x + 1].vel_pot
+        + grid_in[y - 1][x].vel_pot
+        + grid_in[y + 1][x].vel_pot
+        - grid_in[y][x].vel_div)
+        * 0.25;
+    return grid_out[y][x].vel_pot - old_pot;
 }
