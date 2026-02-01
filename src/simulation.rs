@@ -21,7 +21,7 @@ impl Cell {
     }
 }
 
-const EPS: f64 = 1e-3;
+const EPS: f64 = 1e-2;
 const DIFF_K: f64 = 0.01;
 
 pub fn simulate_frame(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>, dt: f64) {
@@ -116,7 +116,7 @@ fn diffuse_cell(
         + DIFF_K * (n_left.color + n_right.color + n_top.color + n_bottom.color) * 0.25)
         / (DIFF_K + 1.0);
 
-    return grid_out[y][x].vel.length() - old_speed;
+    return (grid_out[y][x].vel.length() - old_speed).abs();
 }
 
 fn advect_cell(
@@ -170,11 +170,13 @@ fn update_cell_vel_pot(
     grid_out: &mut Vec<Vec<Cell>>,
 ) -> f64 {
     let old_pot = grid_in[y][x].vel_pot;
+
     grid_out[y][x].vel_pot = (grid_in[y][x - 1].vel_pot
         + grid_in[y][x + 1].vel_pot
         + grid_in[y - 1][x].vel_pot
         + grid_in[y + 1][x].vel_pot
         - grid_in[y][x].vel_div)
         * 0.25;
-    return grid_out[y][x].vel_pot - old_pot;
+
+    return (grid_out[y][x].vel_pot - old_pot).abs();
 }
