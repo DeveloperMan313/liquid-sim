@@ -34,17 +34,23 @@ pub fn simulate_frame(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>, 
     // result is in ?
 }
 
-fn simulate_diffusion(grid_in: &Vec<Vec<Cell>>, grid_out: &mut Vec<Vec<Cell>>) {
+fn simulate_diffusion(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>) {
     let mut delta_max: f64 = INFINITY;
+    let mut switch_grids = false;
+
     while delta_max > EPS {
         delta_max = 0.0;
-        // don't simulate outer cells for predictable access to 4 neighbors
-        for (y, inner_rows) in grid_in[1..grid_in.len() - 1].iter().enumerate() {
-            for (x, _) in inner_rows[1..inner_rows.len() - 1].iter().enumerate() {
-                // account for skipped 1st row/column
-                delta_max = delta_max.max(diffuse_cell(x + 1, y + 1, grid_in, grid_out));
+
+        for y in 1..grid_1.len() - 1 {
+            for x in 1..grid_1[0].len() - 1 {
+                delta_max = match switch_grids {
+                    true => delta_max.max(diffuse_cell(x, y, grid_2, grid_1)),
+                    false => delta_max.max(diffuse_cell(x, y, grid_1, grid_2)),
+                };
             }
         }
+
+        switch_grids = !switch_grids;
     }
 }
 
@@ -71,20 +77,21 @@ fn clear_velocity_divergence(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<C
     }
 
     let mut delta_max: f64 = INFINITY;
-    let mut switch_grids = false;
+    let mut switch_grids = true;
+
     while delta_max > EPS {
-        switch_grids = !switch_grids;
         delta_max = 0.0;
 
-        for y in 1..grid_1.len() - 2 {
-            for x in 1..grid_1[0].len() - 2 {
-                // account for skipped 1st row/column
+        for y in 1..grid_1.len() - 1 {
+            for x in 1..grid_1[0].len() - 1 {
                 delta_max = match switch_grids {
-                    true => delta_max.max(update_cell_vel_pot(x + 1, y + 1, grid_2, grid_1)),
-                    false => delta_max.max(update_cell_vel_pot(x + 1, y + 1, grid_1, grid_2)),
+                    true => delta_max.max(update_cell_vel_pot(x, y, grid_2, grid_1)),
+                    false => delta_max.max(update_cell_vel_pot(x, y, grid_1, grid_2)),
                 };
             }
         }
+
+        switch_grids = !switch_grids;
     }
 }
 
@@ -109,7 +116,7 @@ fn diffuse_cell(
         + DIFF_K * (n_left.color + n_right.color + n_top.color + n_bottom.color) * 0.25)
         / (DIFF_K + 1.0);
 
-    return curr.vel.length() - old_speed;
+    return grid_out[y][x].vel.length() - old_speed;
 }
 
 fn advect_cell(
