@@ -1,25 +1,8 @@
 use std::f64::INFINITY;
 
-use macroquad::math::{DVec2, DVec4};
+use macroquad::math::DVec2;
 
-#[derive(Clone, Copy)]
-pub struct Cell {
-    pub vel: DVec2,
-    vel_div: f64,
-    vel_pot: f64,
-    pub color: DVec4,
-}
-
-impl Cell {
-    pub fn new() -> Cell {
-        return Cell {
-            vel: DVec2::ZERO,
-            vel_div: 0.0,
-            vel_pot: 0.0,
-            color: DVec4::ZERO,
-        };
-    }
-}
+use crate::entities::Cell;
 
 const EPS: f64 = 1e-2;
 const DIFF_K: f64 = 0.01;

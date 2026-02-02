@@ -1,13 +1,9 @@
 use macroquad::prelude::*;
 
-use crate::simulation::{Cell, simulate_frame};
-
-#[allow(dead_code)]
-enum RenderView {
-    Color,
-    Speed,
-    Velocity,
-}
+use crate::{
+    entities::{Cell, RenderView},
+    simulation::simulate_frame,
+};
 
 pub async fn run() {
     // init flow grid
