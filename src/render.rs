@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub async fn run() {
-    let conf = SimConfig::new();
+    let mut conf = SimConfig::new();
 
     let mut grid_1 = vec![vec![Cell::new(); conf.grid_width]; conf.grid_height];
     let mut grid_2 = grid_1.clone();
@@ -36,11 +36,24 @@ pub async fn run() {
     }
 
     loop {
+        handle_input(&mut conf);
+
         simulate_frame(&mut grid_1, &mut grid_2, dt, &conf);
 
         render_liquid(&grid_1, &conf);
 
         next_frame().await
+    }
+}
+
+fn handle_input(conf: &mut SimConfig) {
+    if let Some(ch) = get_char_pressed() {
+        match ch {
+            '1' => conf.render_view = RenderView::Color,
+            '2' => conf.render_view = RenderView::Speed,
+            '3' => conf.render_view = RenderView::Velocity,
+            _ => (),
+        }
     }
 }
 

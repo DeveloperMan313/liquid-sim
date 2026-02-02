@@ -19,7 +19,6 @@ impl Cell {
     }
 }
 
-#[allow(dead_code)]
 pub enum RenderView {
     Color,
     Speed,
