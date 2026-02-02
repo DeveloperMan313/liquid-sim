@@ -2,37 +2,39 @@ use std::f64::INFINITY;
 
 use macroquad::math::DVec2;
 
-use crate::entities::Cell;
+use crate::entities::{Cell, SimConfig};
 
-const EPS: f64 = 1e-2;
-const DIFF_K: f64 = 0.01;
-
-pub fn simulate_frame(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>, dt: f64) {
+pub fn simulate_frame(
+    grid_1: &mut Vec<Vec<Cell>>,
+    grid_2: &mut Vec<Vec<Cell>>,
+    dt: f64,
+    conf: &SimConfig,
+) {
     // initial state is in grid_1
 
-    simulate_diffusion(grid_1, grid_2);
+    simulate_diffusion(grid_1, grid_2, conf);
 
     simulate_advection(grid_2, grid_1, dt);
 
-    clear_velocity_divergence(grid_1, grid_2);
+    clear_velocity_divergence(grid_1, grid_2, conf);
 
     // updated state is in grid_1
 }
 
-fn simulate_diffusion(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>) {
+fn simulate_diffusion(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>, conf: &SimConfig) {
     let mut delta_max: f64 = INFINITY;
     let mut switch_grids = false;
 
     // grid_2 should hold last update
-    while delta_max > EPS || !switch_grids {
+    while delta_max > conf.eps || !switch_grids {
         delta_max = 0.0;
 
         // skip outer rows/columns for predictable 4 neighbor access
         for y in 1..grid_1.len() - 1 {
             for x in 1..grid_1[0].len() - 1 {
                 delta_max = match switch_grids {
-                    true => delta_max.max(diffuse_cell(x, y, grid_2, grid_1)),
-                    false => delta_max.max(diffuse_cell(x, y, grid_1, grid_2)),
+                    true => delta_max.max(diffuse_cell(x, y, grid_2, grid_1, conf)),
+                    false => delta_max.max(diffuse_cell(x, y, grid_1, grid_2, conf)),
                 };
             }
         }
@@ -49,7 +51,11 @@ fn simulate_advection(grid_in: &Vec<Vec<Cell>>, grid_out: &mut Vec<Vec<Cell>>, d
     }
 }
 
-fn clear_velocity_divergence(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>) {
+fn clear_velocity_divergence(
+    grid_1: &mut Vec<Vec<Cell>>,
+    grid_2: &mut Vec<Vec<Cell>>,
+    conf: &SimConfig,
+) {
     // calculate velocity divergence
     for y in 1..grid_1.len() - 1 {
         for x in 1..grid_1[0].len() - 1 {
@@ -67,7 +73,7 @@ fn clear_velocity_divergence(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<C
     let mut switch_grids = false;
 
     // grid_2 should hold last update
-    while delta_max > EPS || !switch_grids {
+    while delta_max > conf.eps || !switch_grids {
         delta_max = 0.0;
 
         for y in 1..grid_1.len() - 1 {
@@ -100,6 +106,7 @@ fn diffuse_cell(
     y: usize,
     grid_in: &Vec<Vec<Cell>>,
     grid_out: &mut Vec<Vec<Cell>>,
+    conf: &SimConfig,
 ) -> f64 {
     let curr = &grid_in[y][x];
     let n_left = &grid_in[y][x - 1];
@@ -109,11 +116,11 @@ fn diffuse_cell(
     let old_speed = curr.vel.length();
 
     grid_out[y][x].vel = (curr.vel
-        + DIFF_K * (n_left.vel + n_right.vel + n_top.vel + n_bottom.vel) * 0.25)
-        / (DIFF_K + 1.0);
+        + conf.diff_k * (n_left.vel + n_right.vel + n_top.vel + n_bottom.vel) * 0.25)
+        / (conf.diff_k + 1.0);
     grid_out[y][x].color = (curr.color
-        + DIFF_K * (n_left.color + n_right.color + n_top.color + n_bottom.color) * 0.25)
-        / (DIFF_K + 1.0);
+        + conf.diff_k * (n_left.color + n_right.color + n_top.color + n_bottom.color) * 0.25)
+        / (conf.diff_k + 1.0);
 
     return (grid_out[y][x].vel.length() - old_speed).abs();
 }
