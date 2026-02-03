@@ -45,7 +45,7 @@ impl SimConfig {
             grid_height: 64,
             cell_size_px: 8,
             eps: 1e-2,
-            diff_k: 1e-2,
+            diff_k: 1e-1,
             speed: 5.0,
             render_view: RenderView::Color,
             brush_vel_mult: 0.1,

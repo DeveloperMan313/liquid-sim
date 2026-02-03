@@ -12,7 +12,7 @@ pub fn simulate_frame(
 ) {
     // initial state is in grid_1
 
-    simulate_diffusion(grid_1, grid_2, conf);
+    simulate_velocity_diffusion(grid_1, grid_2, conf);
 
     simulate_advection(grid_2, grid_1, dt * conf.speed);
 
@@ -21,7 +21,11 @@ pub fn simulate_frame(
     // updated state is in grid_1
 }
 
-fn simulate_diffusion(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>, conf: &SimConfig) {
+fn simulate_velocity_diffusion(
+    grid_1: &mut Vec<Vec<Cell>>,
+    grid_2: &mut Vec<Vec<Cell>>,
+    conf: &SimConfig,
+) {
     let mut delta_max: f64 = INFINITY;
     let mut switch_grids = false;
 
@@ -33,8 +37,8 @@ fn simulate_diffusion(grid_1: &mut Vec<Vec<Cell>>, grid_2: &mut Vec<Vec<Cell>>, 
         for y in 1..grid_1.len() - 1 {
             for x in 1..grid_1[0].len() - 1 {
                 delta_max = match switch_grids {
-                    true => delta_max.max(diffuse_cell(x, y, grid_2, grid_1, conf)),
-                    false => delta_max.max(diffuse_cell(x, y, grid_1, grid_2, conf)),
+                    true => delta_max.max(diffuse_cell_vel(x, y, grid_2, grid_1, conf)),
+                    false => delta_max.max(diffuse_cell_vel(x, y, grid_1, grid_2, conf)),
                 };
             }
         }
@@ -101,7 +105,7 @@ fn clear_velocity_divergence(
 }
 
 // returns speed delta
-fn diffuse_cell(
+fn diffuse_cell_vel(
     x: usize,
     y: usize,
     grid_in: &Vec<Vec<Cell>>,
@@ -118,9 +122,7 @@ fn diffuse_cell(
     grid_out[y][x].vel = (curr.vel
         + conf.diff_k * (n_left.vel + n_right.vel + n_top.vel + n_bottom.vel) * 0.25)
         / (conf.diff_k + 1.0);
-    grid_out[y][x].color = (curr.color
-        + conf.diff_k * (n_left.color + n_right.color + n_top.color + n_bottom.color) * 0.25)
-        / (conf.diff_k + 1.0);
+    grid_out[y][x].color = curr.color;
 
     return (grid_out[y][x].vel.length() - old_speed).abs();
 }
