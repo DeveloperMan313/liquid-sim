@@ -11,8 +11,6 @@ pub async fn run() {
     let mut grid_1 = vec![vec![Cell::new(); conf.grid_width]; conf.grid_height];
     let mut grid_2 = grid_1.clone();
 
-    let dt = 0.1;
-
     // TODO remove this
     request_new_screen_size(
         (conf.grid_width * conf.cell_size_px) as f32,
@@ -36,6 +34,8 @@ pub async fn run() {
     }
 
     loop {
+        let dt = get_frame_time() as f64;
+
         handle_input(&mut conf);
 
         simulate_frame(&mut grid_1, &mut grid_2, dt, &conf);

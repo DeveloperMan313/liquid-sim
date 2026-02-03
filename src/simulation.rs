@@ -14,7 +14,7 @@ pub fn simulate_frame(
 
     simulate_diffusion(grid_1, grid_2, conf);
 
-    simulate_advection(grid_2, grid_1, dt);
+    simulate_advection(grid_2, grid_1, dt * conf.speed);
 
     clear_velocity_divergence(grid_1, grid_2, conf);
 

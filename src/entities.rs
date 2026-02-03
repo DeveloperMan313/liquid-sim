@@ -31,6 +31,7 @@ pub struct SimConfig {
     pub cell_size_px: usize,
     pub eps: f64,
     pub diff_k: f64,
+    pub speed: f64,
     pub render_view: RenderView,
 }
 
@@ -42,6 +43,7 @@ impl SimConfig {
             cell_size_px: 8,
             eps: 1e-2,
             diff_k: 1e-2,
+            speed: 5.0,
             render_view: RenderView::Color,
         };
     }
