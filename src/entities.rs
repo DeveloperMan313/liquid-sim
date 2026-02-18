@@ -1,6 +1,6 @@
 use macroquad::math::{DVec2, DVec4};
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Cell {
     pub vel: DVec2,
     pub vel_div: f64,
@@ -21,12 +21,14 @@ impl Cell {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum RenderView {
     Color,
     Speed,
     Velocity,
 }
 
+#[derive(Clone, Copy)]
 pub struct SimConfig {
     pub grid_width: usize,
     pub grid_height: usize,

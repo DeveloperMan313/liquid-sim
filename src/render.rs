@@ -1,4 +1,5 @@
 use macroquad::prelude::*;
+use std::thread;
 
 use crate::{
     entities::{BrushState, Cell, RenderView, SimConfig},
@@ -9,8 +10,10 @@ pub async fn run() {
     let mut conf = SimConfig::new();
     let mut brush = BrushState::new();
 
-    let mut grid_1 = vec![vec![Cell::new(); conf.grid_width]; conf.grid_height];
-    let mut grid_2 = grid_1.clone();
+    let mut grid_input = vec![vec![Cell::new(); conf.grid_width]; conf.grid_height]; // user input deltas, reset every iteration
+    let mut grid_sim = grid_input.clone(); // simulation buffer, in/out
+    let mut grid_sim_inner = grid_input.clone(); // inner simulation buffer
+    let mut grid_render = grid_input.clone(); // rendered on screen
 
     // TODO remove this
     request_new_screen_size(
@@ -19,33 +22,72 @@ pub async fn run() {
     );
 
     // for demo
-    for y in 1..grid_1.len() - 1 {
-        for x in 1..grid_1[0].len() - 1 {
+    for y in 1..grid_sim.len() - 1 {
+        for x in 1..grid_sim[0].len() - 1 {
             if x > conf.grid_width / 2 {
-                grid_1[y][x].color[0] = 1.0;
-                grid_1[y][x].color[3] = 1.0;
+                grid_sim[y][x].color[0] = 1.0;
+                grid_sim[y][x].color[3] = 1.0;
             }
             if y > conf.grid_height / 2 {
-                grid_1[y][x].color[1] = 1.0;
-                grid_1[y][x].color[3] = 1.0;
+                grid_sim[y][x].color[1] = 1.0;
+                grid_sim[y][x].color[3] = 1.0;
             }
         }
     }
 
+    let mut sim_dt: f64 = 0.0;
+
     loop {
-        let dt = get_frame_time() as f64;
+        for y in 0..grid_sim.len() {
+            for x in 0..grid_sim[0].len() {
+                grid_sim[y][x].vel += grid_input[y][x].vel;
+            }
+        }
 
-        handle_input(&mut grid_1, dt, &mut brush, &mut conf);
+        let sim_handle = thread::spawn(move || {
+            simulate_frame(&mut grid_sim, &mut grid_sim_inner, sim_dt, conf);
+            (grid_sim, grid_sim_inner)
+        });
 
-        simulate_frame(&mut grid_1, &mut grid_2, dt, &conf);
+        sim_dt = 0.0;
 
-        render_grid(&grid_1, &conf);
+        while !sim_handle.is_finished() {
+            let dt = get_frame_time() as f64;
+            sim_dt += dt;
 
-        next_frame().await
+            handle_input(&mut grid_input, &mut grid_render, dt, &mut brush, &mut conf);
+
+            render_grid(&grid_render, &conf);
+
+            next_frame().await;
+        }
+
+        (grid_sim, grid_sim_inner) = sim_handle
+            .join()
+            .expect("Couldn't join on the simulation thread");
+
+        for y in 0..grid_render.len() {
+            for x in 0..grid_render[0].len() {
+                grid_render[y][x] = grid_sim[y][x];
+            }
+        }
     }
 }
 
-fn handle_input(grid: &mut Vec<Vec<Cell>>, dt: f64, brush: &mut BrushState, conf: &mut SimConfig) {
+fn handle_input(
+    grid_input: &mut Vec<Vec<Cell>>,
+    grid_render: &mut Vec<Vec<Cell>>,
+    dt: f64,
+    brush: &mut BrushState,
+    conf: &mut SimConfig,
+) {
+    // clear grid_input velocity
+    for row in grid_input.iter_mut() {
+        for cell in row.iter_mut() {
+            cell.vel = DVec2::ZERO;
+        }
+    }
+
     // clear last square brush
     let (mut cx, mut cy) = brush.prev_center;
     for y in (cy - brush.size).max(1)..=(cy + brush.size).min(conf.grid_height as i32 - 2) {
@@ -55,7 +97,7 @@ fn handle_input(grid: &mut Vec<Vec<Cell>>, dt: f64, brush: &mut BrushState, conf
                 || y == cy - brush.size
                 || y == cy + brush.size
             {
-                grid[y as usize][x as usize].brush_outline = false;
+                grid_render[y as usize][x as usize].brush_outline = false;
             }
         }
     }
@@ -83,7 +125,7 @@ fn handle_input(grid: &mut Vec<Vec<Cell>>, dt: f64, brush: &mut BrushState, conf
                 || y == cy - brush.size
                 || y == cy + brush.size
             {
-                grid[y as usize][x as usize].brush_outline = true;
+                grid_render[y as usize][x as usize].brush_outline = true;
             }
         }
     }
@@ -95,7 +137,7 @@ fn handle_input(grid: &mut Vec<Vec<Cell>>, dt: f64, brush: &mut BrushState, conf
         // square brush
         for y in (cy - brush.size).max(1)..=(cy + brush.size).min(conf.grid_height as i32 - 2) {
             for x in (cx - brush.size).max(1)..=(cx + brush.size).min(conf.grid_width as i32 - 2) {
-                grid[y as usize][x as usize].vel += vel_delta;
+                grid_input[y as usize][x as usize].vel += vel_delta;
             }
         }
     }

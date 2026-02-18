@@ -8,15 +8,15 @@ pub fn simulate_frame(
     grid_1: &mut Vec<Vec<Cell>>,
     grid_2: &mut Vec<Vec<Cell>>,
     dt: f64,
-    conf: &SimConfig,
+    conf: SimConfig,
 ) {
     // initial state is in grid_1
 
-    simulate_velocity_diffusion(grid_1, grid_2, conf);
+    simulate_velocity_diffusion(grid_1, grid_2, &conf);
 
     simulate_advection(grid_2, grid_1, dt * conf.speed);
 
-    clear_velocity_divergence(grid_1, grid_2, conf);
+    clear_velocity_divergence(grid_1, grid_2, &conf);
 
     // updated state is in grid_1
 }
