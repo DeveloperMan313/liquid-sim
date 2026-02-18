@@ -1,4 +1,5 @@
 use macroquad::prelude::*;
+use std::iter;
 use std::thread;
 
 use crate::{
@@ -55,9 +56,9 @@ pub async fn run() {
             let dt = get_frame_time() as f64;
             sim_dt += dt;
 
-            handle_input(&mut grid_input, &mut grid_render, dt, &mut brush, &mut conf);
+            handle_input(&mut grid_input, dt, &mut brush, &mut conf);
 
-            render_grid(&grid_render, &conf);
+            render_grid(&grid_render, &brush, &conf);
 
             next_frame().await;
         }
@@ -74,31 +75,11 @@ pub async fn run() {
     }
 }
 
-fn handle_input(
-    grid_input: &mut Vec<Vec<Cell>>,
-    grid_render: &mut Vec<Vec<Cell>>,
-    dt: f64,
-    brush: &mut BrushState,
-    conf: &mut SimConfig,
-) {
+fn handle_input(grid: &mut Vec<Vec<Cell>>, dt: f64, brush: &mut BrushState, conf: &mut SimConfig) {
     // clear grid_input velocity
-    for row in grid_input.iter_mut() {
+    for row in grid.iter_mut() {
         for cell in row.iter_mut() {
             cell.vel = DVec2::ZERO;
-        }
-    }
-
-    // clear last square brush
-    let (mut cx, mut cy) = brush.prev_center;
-    for y in (cy - brush.size).max(1)..=(cy + brush.size).min(conf.grid_height as i32 - 2) {
-        for x in (cx - brush.size).max(1)..=(cx + brush.size).min(conf.grid_width as i32 - 2) {
-            if x == cx - brush.size
-                || x == cx + brush.size
-                || y == cy - brush.size
-                || y == cy + brush.size
-            {
-                grid_render[y as usize][x as usize].brush_outline = false;
-            }
         }
     }
 
@@ -115,20 +96,7 @@ fn handle_input(
     let brush_was_drawing = brush.is_drawing;
     brush.is_drawing = is_mouse_button_down(MouseButton::Left);
 
-    // draw current square brush
-    (cx, cy) = window_coords_to_grid_coords(mouse_position(), conf);
-    brush.prev_center = (cx, cy);
-    for y in (cy - brush.size).max(1)..=(cy + brush.size).min(conf.grid_height as i32 - 2) {
-        for x in (cx - brush.size).max(1)..=(cx + brush.size).min(conf.grid_width as i32 - 2) {
-            if x == cx - brush.size
-                || x == cx + brush.size
-                || y == cy - brush.size
-                || y == cy + brush.size
-            {
-                grid_render[y as usize][x as usize].brush_outline = true;
-            }
-        }
-    }
+    let (cx, cy) = window_coords_to_grid_coords(mouse_position(), conf);
 
     // velocity mode
     if brush_was_drawing && brush.is_drawing {
@@ -137,7 +105,7 @@ fn handle_input(
         // square brush
         for y in (cy - brush.size).max(1)..=(cy + brush.size).min(conf.grid_height as i32 - 2) {
             for x in (cx - brush.size).max(1)..=(cx + brush.size).min(conf.grid_width as i32 - 2) {
-                grid_input[y as usize][x as usize].vel += vel_delta;
+                grid[y as usize][x as usize].vel += vel_delta;
             }
         }
     }
@@ -152,34 +120,47 @@ fn handle_input(
     }
 }
 
-fn render_grid(grid: &Vec<Vec<Cell>>, conf: &SimConfig) {
+fn render_grid(grid: &Vec<Vec<Cell>>, brush: &BrushState, conf: &SimConfig) {
+    let (cx, cy) = window_coords_to_grid_coords(mouse_position(), conf);
+
     let texture_bytes: Vec<u8> = grid
         .iter()
+        .enumerate()
+        .map(|idx_row| iter::zip(iter::once(idx_row.0 as i32).cycle(), idx_row.1)) // add y to cells
         .flatten()
-        .map(|cell: &Cell| match conf.render_view {
-            RenderView::Color => (cell.color.to_array(), cell.brush_outline),
-            RenderView::Speed => {
-                let speed = cell.vel.length();
-                let speed_0_to_1 = speed / (speed + 1.0);
-                ((DVec4::ONE * speed_0_to_1).to_array(), cell.brush_outline)
-            }
-            RenderView::Velocity => {
-                let vel_minus_1_to_1 = cell.vel / (cell.vel.length() + 1.0);
-                (
-                    dvec4(
-                        vel_minus_1_to_1.x.abs(),
-                        vel_minus_1_to_1.y.abs(),
-                        vel_minus_1_to_1.dot(dvec2(1.0, 1.0)),
-                        1.0,
-                    )
-                    .to_array(),
-                    cell.brush_outline,
-                )
-            }
+        .enumerate()
+        .map(|(idx, (y, cell))| (y, (idx % conf.grid_width) as i32, cell)) // add x to cells
+        .map(|(y, x, cell)| {
+            (
+                y,
+                x,
+                match conf.render_view {
+                    RenderView::Color => cell.color.to_array(),
+                    RenderView::Speed => {
+                        let speed = cell.vel.length();
+                        let speed_0_to_1 = speed / (speed + 1.0);
+                        (DVec4::ONE * speed_0_to_1).to_array()
+                    }
+                    RenderView::Velocity => {
+                        let vel_minus_1_to_1 = cell.vel / (cell.vel.length() + 1.0);
+                        dvec4(
+                            vel_minus_1_to_1.x.abs(),
+                            vel_minus_1_to_1.y.abs(),
+                            vel_minus_1_to_1.dot(dvec2(1.0, 1.0)),
+                            1.0,
+                        )
+                        .to_array()
+                    }
+                },
+            )
         })
-        .map(|(color, brush_outline)| match brush_outline {
-            true => [1.0 - color[0], 1.0 - color[1], 1.0 - color[2], 1.0],
-            false => color,
+        .map(|(y, x, color)| {
+            match ((x - cx).abs() + (y - cy).abs() <= brush.size * 2) // square brush
+            && ((x - cx).abs() == brush.size || (y - cy).abs() == brush.size)
+            {
+                true => [1.0 - color[0], 1.0 - color[1], 1.0 - color[2], 1.0],
+                false => color,
+            }
         })
         .flatten()
         .map(|f: f64| (f * 256.) as u8)

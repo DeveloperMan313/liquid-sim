@@ -6,7 +6,6 @@ pub struct Cell {
     pub vel_div: f64,
     pub vel_pot: f64,
     pub color: DVec4,
-    pub brush_outline: bool,
 }
 
 impl Cell {
@@ -16,7 +15,6 @@ impl Cell {
             vel_div: 0.0,
             vel_pot: 0.0,
             color: DVec4::ZERO,
-            brush_outline: false,
         }
     }
 }
@@ -58,7 +56,6 @@ impl SimConfig {
 pub struct BrushState {
     pub size: i32,
     pub is_drawing: bool,
-    pub prev_center: (i32, i32),
 }
 
 impl BrushState {
@@ -66,7 +63,6 @@ impl BrushState {
         BrushState {
             size: 3,
             is_drawing: false,
-            prev_center: (0, 0),
         }
     }
 }
